@@ -1,5 +1,7 @@
 # deep-learning-tweets-classifier
 
+This tool uses Word2Vec and Bag of Words combined with Neural Networks, SVN, KNN, Naive Bayes, Decision Trees and ExtraTrees to classify tweets according to an annotated file.
+
 Run this in command line:
 
 > wget http://nlp.stanford.edu/data/glove.6B.zip
