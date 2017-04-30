@@ -106,8 +106,13 @@ def train(clf, X_train, X_test, y_train, y_test):
         clf.fit(X_train[fl], y_train[fl])
         pred = clf.predict(X_test[fl])
         acc = metrics.accuracy_score(y_test[fl], pred)
-        print("Fold "+str(fl)+" acc:"+str(acc))
+        precision = metrics.precision_score(y_test[fl], pred)
+        recall = metrics.recall_score(y_test[fl], pred)
+        f1 = metrics.f1_score(y_test[fl], pred)
+        print("Fold "+str(fl))
         print(metrics.classification_report(y_test[fl], pred))
+        print("Acc:"+str(acc))
+        print(metrics.confusion_matrix(y_test[fl], pred))
         acc_tot += acc    
     acc_tot /= FOLDS
     print("Total accuracy: "+str(acc_tot))
