@@ -137,7 +137,7 @@ print("BAG OF WORDS")
 X_train, X_test, y_train, y_test = preprocess_bag(X,y)
 for i in range(len(names)):
     print("BagOfWords " + names[i])
-    clf = ExtraTreesClassifier(n_estimators=200)
+    clf = clfs[i]
     train(clf, X_train, X_test, y_train, y_test)
 
 """
