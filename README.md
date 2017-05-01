@@ -10,7 +10,7 @@ Run this in command line:
 
 > sudo pip install -r requirements.txt
 
-Place your data.csv (it only requires the column "Text" and "Class").
+Place your data.csv in the directory. It only requires the column "Text" where the tweets text is placed and the column "Class" than contains the annotated categories.
 
 Run the python script:
 
