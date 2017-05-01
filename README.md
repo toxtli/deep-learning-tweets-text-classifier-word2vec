@@ -8,6 +8,8 @@ Run this in command line:
 
 > unzip glove.6B.zip
 
+> sudo pip install -r requirements.txt
+
 Place your data.csv (it only requires the column "Text" and "Class").
 
 Run the python script:
