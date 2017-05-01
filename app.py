@@ -1,6 +1,8 @@
 import gensim
 import pandas
 import numpy as np
+from scipy import interp
+import matplotlib.pyplot as plt
 from collections import defaultdict
 from sklearn.pipeline import Pipeline
 from sklearn.naive_bayes import GaussianNB
@@ -20,8 +22,6 @@ W2V_FILE = "glove.6B.300d.txt"
 class MeanEmbeddingVectorizer(object):
     def __init__(self, word2vec):
         self.word2vec = word2vec
-        # if a text is empty we should return a vector of zeros
-        # with the same dimensionality as all the other vectors
         self.dim = len(word2vec.itervalues().next())
 
     def fit(self, X, y):
@@ -43,14 +43,10 @@ class TfidfEmbeddingVectorizer(object):
     def fit(self, X, y):
         tfidf = TfidfVectorizer(analyzer=lambda x: x)
         tfidf.fit(X)
-        # if a word was never seen - it must be at least as infrequent
-        # as any of the known words - so the default idf is the max of 
-        # known idf's
         max_idf = max(tfidf.idf_)
         self.word2weight = defaultdict(
             lambda: max_idf,
             [(w, tfidf.idf_[i]) for w, i in tfidf.vocabulary_.items()])
-
         return self
 
     def transform(self, X):
@@ -74,10 +70,12 @@ def preprocess_w2v(X, y):
     X_train, X_test, y_train, y_test = [], [], [], []
     skf = StratifiedKFold(n_splits=FOLDS)
     for train_index, test_index in skf.split(X, y):
-        X_train.append(X[train_index])
-        X_test.append(X[test_index])
-        y_train.append(y[train_index])
-        y_test.append(y[test_index])
+        X_train_value, X_test_value = X[train_index], X[test_index]
+        y_train_value, y_test_value = y[train_index], y[test_index]
+        X_train.append(X_train_value)
+        X_test.append(X_test_value)
+        y_train.append(y_train_value)
+        y_test.append(y_test_value)
     #X_train, X_test, y_train, y_test = cross_validation.train_test_split(X, y)
     return X_train, X_test, y_train, y_test
 
@@ -101,49 +99,120 @@ def preprocess_bag(X, y):
     return X_train, X_test, y_train, y_test
 
 def train(clf, X_train, X_test, y_train, y_test):
-    acc_tot = 0
+    preds = []
+    mean_tpr = 0.0
+    fpr, tpr, roc_auc = {}, {}, {}
+    mean_fpr = np.linspace(0, 1, 100)
+    acc_tot = precision_tot = recall_tot = f1_tot = support_tot = 0
+    headers = 'fl,precision,recall,f1,support,acc,TN, FP, FN, TP'
+    print(headers)
     for fl in range(FOLDS):
         clf.fit(X_train[fl], y_train[fl])
         pred = clf.predict(X_test[fl])
         acc = metrics.accuracy_score(y_test[fl], pred)
-        precision = metrics.precision_score(y_test[fl], pred)
-        recall = metrics.recall_score(y_test[fl], pred)
-        f1 = metrics.f1_score(y_test[fl], pred)
-        print("Fold "+str(fl))
-        print(metrics.classification_report(y_test[fl], pred))
-        print("Acc:"+str(acc))
-        print(metrics.confusion_matrix(y_test[fl], pred))
-        acc_tot += acc    
+        conf_matrix = metrics.confusion_matrix(y_test[fl], pred)
+        precision, recall, f1, _ = metrics.precision_recall_fscore_support(y_test[fl], pred, average="weighted")
+        support = conf_matrix[0][0]+conf_matrix[0][1]+conf_matrix[1][0]+conf_matrix[1][1]
+        fpr, tpr, thresholds = metrics.roc_curve(y_test[fl], pred)
+        roc_auc = metrics.auc(fpr, tpr)
+        mean_tpr += interp(mean_fpr, fpr, tpr)
+        # print("Fold "+str(fl))
+        print("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s" % (fl, precision, recall, f1, support, acc, conf_matrix[0][0], conf_matrix[0][1], conf_matrix[1][0], conf_matrix[1][1]))
+        # print(metrics.classification_report(y_test[fl], pred))
+        # print("Acc:"+str(acc))
+        # print(metrics.confusion_matrix(y_test[fl], pred))
+        # mean_tpr[0] = 0.0
+        # plt.plot(fpr, tpr, lw=lw, label='ROC fold %d (area = %0.2f)' % (fl, roc_auc))
+        acc_tot += acc
+        precision_tot += precision
+        recall_tot += recall
+        f1_tot += f1
+        support_tot += support
+    mean_tpr /= FOLDS
+    mean_tpr[-1] = 1.0
+    mean_auc = metrics.auc(mean_fpr, mean_tpr)
     acc_tot /= FOLDS
+    precision_tot /= FOLDS
+    recall_tot /= FOLDS
+    f1_tot /= FOLDS
+    support_tot /= FOLDS
     print("Total accuracy: "+str(acc_tot))
+    return {
+        'mean_fpr': mean_fpr,
+        'mean_tpr': mean_tpr, 
+        'mean_auc': mean_auc
+    }
+
+def plot(title, records):
+    lw = 2
+    plt.figure()
+    plt.plot([0, 1], [0, 1], linestyle='--', lw=lw, color='k', label='Luck')
+    for record in records:
+        desc = '%s (area = %0.2f)' % (record['label'], record['mean_auc'])
+        plt.plot(record['mean_fpr'], record['mean_tpr'], linestyle='--', label=desc, lw=lw)
+    plt.xlim([-0.05, 1.05])
+    plt.ylim([-0.05, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title(title)
+    plt.legend(loc="lower right")
+    plt.show()
+
 
 X, y = load_data_and_labels("data.csv")
+"""
 clfs = [ExtraTreesClassifier(n_estimators=200),
         svm.SVC(C=1, kernel='linear'),
         KNeighborsClassifier(n_neighbors=3),
         DecisionTreeClassifier(random_state=0),
         MLPClassifier(alpha=1),
         GaussianNB()]
-names = ['ExtraTrees', 'SVM', 'KNN', 'Decision Tree', 'Neural Network', 'Naive Bayes']
+names = ['ExtraTrees', 'SVM', 'KNN', 'DecisionTree', 'NeuralNetwork', 'NaiveBayes']
+"""
+clfs = [ExtraTreesClassifier(n_estimators=200),
+        svm.SVC(C=1, kernel='linear'),
+        KNeighborsClassifier(n_neighbors=3),
+        DecisionTreeClassifier(random_state=0),
+        MLPClassifier(alpha=1),
+        GaussianNB()]
+names = ['ExtraTrees', 'SVM', 'KNN', 'DecisionTree', 'NeuralNetwork', 'NaiveBayes']
 
 print("WORD2VEC")
 with open(W2V_FILE, "rb") as lines:
     w2v = {line.split()[0]: np.array(map(float, line.split()[1:])) for line in lines}
 X_train, X_test, y_train, y_test = preprocess_w2v(X,y)
 
-for i in range(len(names)):
-    print("Word2Vec " + names[i])
-    clf = Pipeline([
-        ("word2vec vectorizer", MeanEmbeddingVectorizer(w2v)),
-        ("classifier", clfs[i])])
-    train(clf, X_train, X_test, y_train, y_test)
+cont = 0
+sections = ['Word2Vec', 'BagOfWords']
 
-print("BAG OF WORDS")
+results = {}
+section = sections[cont]
+print(section)
+results[section] = {}
+for i in range(len(names)):
+    print(section + " " + names[i])
+    clf = Pipeline([
+        (section + " vectorizer", MeanEmbeddingVectorizer(w2v)),
+        ("classifier", clfs[i])])
+    results[section][names[i]] = train(clf, X_train, X_test, y_train, y_test)
+
+cont += 1
+section = sections[cont]
+print(section)
+results[section] = {}
 X_train, X_test, y_train, y_test = preprocess_bag(X,y)
 for i in range(len(names)):
-    print("BagOfWords " + names[i])
+    print(section + " " + names[i])
     clf = clfs[i]
-    train(clf, X_train, X_test, y_train, y_test)
+    results[section][names[i]] = train(clf, X_train, X_test, y_train, y_test)
+
+for name in names:
+    records = []
+    for section in sections:
+        values = results[section][name]
+        values['label'] = section
+        records.append(values)
+    plot('Comparison using ' + name, records)
 
 """
 etree_w2v_tfidf = Pipeline([
