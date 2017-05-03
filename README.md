@@ -1,6 +1,6 @@
-# deep-learning-tweets-classifier
+# deep-learning-tweets-text-classifier-word2vec
 
-This tool uses Word2Vec and Bag of Words combined with Neural Networks, SVN, KNN, Naive Bayes, Decision Trees and ExtraTrees to classify tweets according to an annotated file.
+This tool uses Word2Vec and Bag of Words combined with Neural Networks, SVN, KNN, Naive Bayes, Decision Trees and ExtraTrees to classify tweets according to an annotated file. This classifier was used to classify tweets from Twitter.
 
 Run this in command line:
 
@@ -10,10 +10,10 @@ Run this in command line:
 
 > sudo pip install -r requirements.txt
 
-Place your data.csv in the directory. It only requires the column "Text" where the tweets text is placed and the column "Class" than contains the annotated categories.
+Demo files are in place in order to have a clear idea about how this works.
 
 Run the python script:
 
 > python app.py
 
-The tool will print the results in the terminal.
+The tool will print the results in the terminal and store in the results.csv file.
