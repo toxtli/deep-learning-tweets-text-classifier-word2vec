@@ -16,4 +16,10 @@ Run the python script:
 
 > python app.py
 
+or
+
+> python app.py -t train.csv -i predict.csv -o results.csv -w glove.6B.50d.txt
+
 The tool will print the results in the terminal and store in the results.csv file.
+
+This classifier is multilingual, for instance if you want to run it in spanish you can use this word vector file http://cs.famaf.unc.edu.ar/~ccardellino/SBWCE/SBW-vectors-300-min5.txt.bz2 instead of the glove file.
